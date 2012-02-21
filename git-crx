@@ -1,0 +1,27 @@
+#!/usr/bin/python
+# -*- tab-width: 4; use-tabs: 1; coding: utf-8 -*-
+# vim:tabstop=4:noexpandtab:
+"""git crx [ops]
+
+Produces a CRX file from a git repository
+"""
+import os, json, subprocess, tarfile, io
+from optparse import OptionParser
+
+parser = OptionParser()
+parser.add_option("-k", "--key", dest="keyfile",
+                  help="use or generate private key in FILE", metavar="FILE")
+parser.add_option("-v", "--version", dest="version",
+                  help="Replace the manifest's version with VERSION, or generate one if it's 'auto'", metavar='VERSION')
+parser.add_option("-u", "--url", dest="url",
+                  help="Replace the update url with URL", metavar="URL")
+
+def git_archive(*args):
+	ga = subprocess.Popen(['git', 'archive']+args, stdout=subprocess.PIPE)
+	so, _ = ga.communicate()
+	return tarfile.open(io.StringIO(ga.stdout))
+
+
+if __name__ == '__main__':
+	options, args = parser.parse_args()
+

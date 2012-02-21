@@ -1,0 +1,64 @@
+#!/usr/bin/python
+"""
+Generates a chrome update XML from a directory of crx files.
+"""
+import os, sys, io
+import zipfile, json, struct, hashlib, glob, genshi.template
+
+
+class CRXFile(zipfile.ZipFile):
+	HEADER = "<4siii"
+	def __init__(self, file):
+		if isinstance(file, basestring):
+			file = io.open(file, 'rb')
+		l = struct.calcsize(self.HEADER)
+		data = file.read(l)
+		magic, self.version, klen, slen = struct.unpack(self.HEADER, data)
+		assert magic == "Cr24"
+		assert self.version == 2
+		self.publickey = file.read(klen)
+		self.signature = file.read(slen)
+		#CURSE YOU OLD CLASSES
+		zipfile.ZipFile.__init__(self, file, mode='r', allowZip64=True)
+	
+	def appid(self):
+		"""cf.appid() -> str
+		Get the appid as used by chrome.
+		"""
+		# Blatently pulled from https://src.chromium.org/svn/trunk/src/tools/crx_id/crx_id.py
+		khash = hashlib.sha256(self.publickey).digest()
+		rv = ''
+		base = ord('a')
+		for b in map(ord, khash[:128/8]):
+			d1, d2 = divmod(b, 16)
+			rv += chr(d1+base) + chr(d2+base)
+		return rv
+	
+	def manifest(self):
+		"""cf.manifest() -> object
+		Returns the parsed manifest data.
+		"""
+		return json.load(self.open('manifest.json'))
+
+xmlfile = os.path.abspath(sys.argv[1])
+crxdir = os.path.dirname(xmlfile)
+
+packs = []
+for fn in glob.glob(crxdir+"/*.crx"):
+	crx = CRXFile(fn)
+	packs.append({'filename': os.path.basename(fn), 'appid': crx.appid(), 'version': crx.manifest()['version']})
+
+tmpl = genshi.template.MarkupTemplate(
+"""<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'
+          xmlns:py="http://genshi.edgewall.org/">
+	<app py:for='pack in packs' appid='${pack.appid}'>
+		<updatecheck codebase='${pack.filename}' version='${pack.version}' />
+	</app>
+</gupdate>
+"""
+)
+
+with open(xmlfile, 'w') as xf:
+	s = tmpl.generate(packs=packs)
+	xf.write(s.render('xml'))
