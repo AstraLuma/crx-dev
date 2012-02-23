@@ -46,20 +46,23 @@ crxdir = os.path.dirname(xmlfile)
 packs = []
 for fn in glob.glob(crxdir+"/*.crx"):
 	crx = CRXFile(fn)
-	packs.append({'filename': os.path.basename(fn), 'appid': crx.appid(), 'version': crx.manifest()['version']})
+	mani = crx.manifest()
+	packs.append({'filename': os.path.basename(fn), 'appid': crx.appid(), 'version': mani['version'], 'url': mani['update_url']})
 
 tmpl = genshi.template.MarkupTemplate(
 """<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'
           xmlns:py="http://genshi.edgewall.org/">
 	<app py:for='pack in packs' appid='${pack.appid}'>
-		<updatecheck codebase='${pack.filename}' version='${pack.version}' />
+		<updatecheck codebase='${url}/${pack.filename}' version='${pack.version}' />
 	</app>
 </gupdate>
 """
 )
 
+url = os.path.dirname(packs[0]['url'])
+
 with open(xmlfile, 'w') as xf:
-	s = tmpl.generate(packs=packs)
+	s = tmpl.generate(packs=packs, url=url)
 	print "Writing out %s..." % xmlfile
 	xf.write(s.render('xml'))
