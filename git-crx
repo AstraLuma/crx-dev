@@ -59,7 +59,7 @@ class ManifestRewriter(object):
 		self.manifest = manifest
 		json.dump(manifest, dest)
 
-def crxmake(src, dst, manifest):
+def crxmake(name, src, dst, manifest):
 	args = ['crxmake',
 		'--pack-extension=%s' % src,
 		'--extension-output=%s' % os.path.join(dst, '%s.crx' % manifest['name']),
@@ -76,4 +76,4 @@ if __name__ == '__main__':
 	mr = ManifestRewriter(args)
 	tmpdir = tempfile.mkdtemp()
 	copygit(tmpdir, {'manifest.json': mr})
-	crxmake(tmpdir, dest, mr.manifest)
+	crxmake(os.path.basename(os.getpwd()), tmpdir, dest, mr.manifest)
