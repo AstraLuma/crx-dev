@@ -47,14 +47,13 @@ class ManifestRewriter(object):
 	def __call__(self, src, dest):
 		manifest = json.load(src)
 		
-		if self.opts.url:
+		if self.opts.url is not None:
 			manifest['update_url'] = self.opts.url
 		
-		if self.opts.version:
+		if self.opts.version is not None:
 			ver = self.opts.version
 			if ver == 'auto':
-				ts = git_last_commit_date()
-				ver = time.strftime('9999.%Y.%m.%d.%H.%M.%S', ts)
+				ver = time.strftime('9999.%Y.%m.%d.%H.%M.%S', git_last_commit_date())
 			manifest['version'] = ver
 		
 		self.manifest = manifest
