@@ -61,4 +61,5 @@ tmpl = genshi.template.MarkupTemplate(
 
 with open(xmlfile, 'w') as xf:
 	s = tmpl.generate(packs=packs)
+	print "Writing out %s..." % xmlfile
 	xf.write(s.render('xml'))
