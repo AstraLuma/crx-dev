@@ -1,11 +1,12 @@
 #!/usr/bin/python
 # -*- tab-width: 4; use-tabs: 1; coding: utf-8 -*-
 # vim:tabstop=4:noexpandtab:
-"""git crx [ops]
+"""git crx [ops] dest
 
 Produces a CRX file from a git repository
 """
-import os, json, subprocess, tarfile, io, json, tempfile
+import os, json, subprocess, tarfile, json, tempfile, time
+from StringIO import StringIO
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -17,15 +18,22 @@ parser.add_option("-u", "--url", dest="url",
                   help="Replace the update url with URL", metavar="URL")
 
 def git_archive():
-	ga = subprocess.Popen(['git', 'archive'], stdout=subprocess.PIPE)
+	ga = subprocess.Popen(['git', 'archive', 'HEAD'], stdout=subprocess.PIPE)
 	so, _ = ga.communicate()
-	return tarfile.open(io.StringIO(so), 'r')
+	return tarfile.open(fileobj=StringIO(so), mode='r')
 
 def git_last_commit_date():
 	gl = subprocess.Popen(['git', 'log', '-1', '--format=%ct'], stdout=subprocess.PIPE)
 	so, _ = gl.communicate()
 	ts = int(so.strip())
 	return ts
+
+def gittime():
+	ts = time.gmtime(git_last_commit_date())
+	vals = []
+	for f in 'YjHM':
+		vals += [time.strftime('%'+f, ts)]
+	return '.'.join(v.lstrip('0') for v in vals)
 
 def copygit(dest, mods={}):
 	tf = git_archive()
@@ -53,7 +61,8 @@ class ManifestRewriter(object):
 		if self.opts.version is not None:
 			ver = self.opts.version
 			if ver == 'auto':
-				ver = time.strftime('9999.%Y.%m.%d.%H.%M.%S', git_last_commit_date())
+				ver = gittime()
+				print "Overwriting version with", ver
 			manifest['version'] = ver
 		
 		self.manifest = manifest
@@ -62,7 +71,7 @@ class ManifestRewriter(object):
 def crxmake(name, src, dst, manifest):
 	args = ['crxmake',
 		'--pack-extension=%s' % src,
-		'--extension-output=%s' % os.path.join(dst, '%s.crx' % manifest['name']),
+		'--extension-output=%s' % os.path.join(dst, '%s.crx' % name),
 		'--mode=crx',
 		'--pack-extension-key=%s' % '.git/crx.pem',
 		]
@@ -73,7 +82,7 @@ if __name__ == '__main__':
 	
 	dest, = args
 	
-	mr = ManifestRewriter(args)
+	mr = ManifestRewriter(options)
 	tmpdir = tempfile.mkdtemp()
 	copygit(tmpdir, {'manifest.json': mr})
-	crxmake(os.path.basename(os.getpwd()), tmpdir, dest, mr.manifest)
+	crxmake(os.path.basename(os.getcwd()), tmpdir, dest, mr.manifest)
