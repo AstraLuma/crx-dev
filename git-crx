@@ -5,7 +5,7 @@
 
 Produces a CRX file from a git repository
 """
-import os, json, subprocess, tarfile, io
+import os, json, subprocess, tarfile, io, json, tempfile
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -16,12 +16,65 @@ parser.add_option("-v", "--version", dest="version",
 parser.add_option("-u", "--url", dest="url",
                   help="Replace the update url with URL", metavar="URL")
 
-def git_archive(*args):
-	ga = subprocess.Popen(['git', 'archive']+args, stdout=subprocess.PIPE)
+def git_archive():
+	ga = subprocess.Popen(['git', 'archive'], stdout=subprocess.PIPE)
 	so, _ = ga.communicate()
-	return tarfile.open(io.StringIO(ga.stdout))
+	return tarfile.open(io.StringIO(so), 'r')
 
+def git_last_commit_date():
+	gl = subprocess.Popen(['git', 'log', '-1', '--format=%ct'], stdout=subprocess.PIPE)
+	so, _ = gl.communicate()
+	ts = int(so.strip())
+	return ts
+
+def copygit(dest, mods={}):
+	tf = git_archive()
+	for mem in tf.getmembers():
+		if mem.isfile() or mem.issym() or mem.islnk():
+			with open(os.path.join(dest, mem.name), 'w') as df:
+				d = tf.extractfile(mem.name)
+				if mem.name in mods:
+					mods[mem.name](d, df)
+				else:
+					df.write(d.read())
+		elif mem.isdir():
+			os.mkdir(os.path.join(dest, mem.name))
+	
+class ManifestRewriter(object):
+	def __init__(self, options):
+		self.opts = options
+	
+	def __call__(self, src, dest):
+		manifest = json.load(src)
+		
+		if self.opts.url:
+			manifest['update_url'] = self.opts.url
+		
+		if self.opts.version:
+			ver = self.opts.version
+			if ver == 'auto':
+				ts = git_last_commit_date()
+				ver = time.strftime('9999.%Y.%m.%d.%H.%M.%S', ts)
+			manifest['version'] = ver
+		
+		self.manifest = manifest
+		json.dump(manifest, dest)
+
+def crxmake(src, dst, manifest):
+	args = ['crxmake',
+		'--pack-extension=%s' % src,
+		'--extension-output=%s' % os.path.join(dst, '%s.crx' % manifest['name']),
+		'--mode=crx',
+		'--pack-extension-key=%s' % '.git/crx.pem',
+		]
+	subprocess.check_call(args)
 
 if __name__ == '__main__':
 	options, args = parser.parse_args()
-
+	
+	dest, = args
+	
+	mr = ManifestRewriter(args)
+	tmpdir = tempfile.mkdtemp()
+	copygit(tmpdir, {'manifest.json': mr})
+	crxmake(tmpdir, dest, mr.manifest)
