@@ -18,7 +18,7 @@ parser.add_option("-u", "--url", dest="url",
                   help="Replace the update url with URL", metavar="URL")
 
 def git_archive():
-	ga = subprocess.Popen(['git', 'archive', 'HEAD'], stdout=subprocess.PIPE)
+	ga = subprocess.Popen(['git', 'archive', 'master'], stdout=subprocess.PIPE)
 	so, _ = ga.communicate()
 	return tarfile.open(fileobj=StringIO(so), mode='r')
 
