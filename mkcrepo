@@ -47,7 +47,8 @@ packs = []
 for fn in glob.glob(crxdir+"/*.crx"):
 	crx = CRXFile(fn)
 	mani = crx.manifest()
-	packs.append({'filename': os.path.basename(fn), 'appid': crx.appid(), 'version': mani['version'], 'url': mani['update_url']})
+	if 'update_url' in mani:
+		packs.append({'filename': os.path.basename(fn), 'appid': crx.appid(), 'version': mani['version'], 'url': mani['update_url']})
 
 tmpl = genshi.template.MarkupTemplate(
 """<?xml version='1.0' encoding='UTF-8'?>
